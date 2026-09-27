@@ -28,9 +28,10 @@
 </head>
 <body>
 <main>
+  <p id="handing" class="hidden">Handing the sign-in to x2rock on this computer…</p>
   <section id="ok" class="hidden">
     <h1>Almost done</h1>
-    <p>Copy this address and paste it into x2rock, where it is waiting for it.</p>
+    <p>If x2rock does not finish by itself, copy this address and paste it into x2rock.</p>
     <textarea id="url" readonly></textarea>
     <button id="copy" type="button">Copy</button>
     <p id="copied" class="hidden">Copied. You can close this tab.</p>
@@ -46,10 +47,20 @@
   </section>
 </main>
 <script>
-  // The whole job: show what Sonos put in the address, so it can be pasted back
-  // into x2rock. Nothing is sent anywhere, and the policy above forbids it.
+  // Show what Sonos put in the address, so it can be pasted back into x2rock -
+  // and, when x2rock is listening on this machine, hand it straight there. The
+  // policy above forbids any request from this page; the one thing it does is
+  // navigate this tab to 127.0.0.1, which never leaves the machine.
   var q = new URLSearchParams(window.location.search);
   var show = function (id) { document.getElementById(id).classList.remove("hidden"); };
+  // x2rock puts the port it listens on at the front of the state, as
+  // `<port>.<random>`; Sonos echoes the state back untouched.
+  var listening = /^(\d{2,5})\./.exec(q.get("state") || "");
+  var port = listening ? Number(listening[1]) : 0;
+  if (port > 0 && port < 65536 && (q.get("code") || q.get("error"))) {
+    document.getElementById("handing").classList.remove("hidden");
+    window.location.replace("http://127.0.0.1:" + port + "/callback" + window.location.search);
+  }
   if (q.get("error")) {
     document.getElementById("reason").textContent =
       q.get("error") + (q.get("error_description") ? ": " + q.get("error_description") : "");
