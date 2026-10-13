@@ -29,6 +29,7 @@
 <body>
 <main>
   <p id="handing" class="hidden">Handing the sign-in to x2rock on this computer…</p>
+  <p id="handing-tv" class="hidden">Handing the sign-in to x2rock on your TV…</p>
   <section id="ok" class="hidden">
     <h1>Almost done</h1>
     <p>If x2rock does not finish by itself, copy this address and paste it into x2rock.</p>
@@ -50,14 +51,30 @@
   // Show what Sonos put in the address, so it can be pasted back into x2rock -
   // and, when x2rock is listening on this machine, hand it straight there. The
   // policy above forbids any request from this page; the one thing it does is
-  // navigate this tab to 127.0.0.1, which never leaves the machine.
+  // navigate this tab to 127.0.0.1, which never leaves the machine, or to a TV's
+  // private LAN address, which never leaves the home network.
   var q = new URLSearchParams(window.location.search);
   var show = function (id) { document.getElementById(id).classList.remove("hidden"); };
   // x2rock puts the port it listens on at the front of the state, as
   // `<port>.<random>`; Sonos echoes the state back untouched.
-  var listening = /^(\d{2,5})\./.exec(q.get("state") || "");
+  var state = q.get("state") || "";
+  var arrived = q.get("code") || q.get("error");
+  var listening = /^(\d{2,5})\./.exec(state);
   var port = listening ? Number(listening[1]) : 0;
-  if (port > 0 && port < 65536 && (q.get("code") || q.get("error"))) {
+  // x2rock on a TV signs in from a phone, so it puts its LAN address in front
+  // too, as `<a>-<b>-<c>-<d>-<port>.<random>`, and the phone is sent there.
+  // Only a private address: this page forwards nowhere else on any network.
+  var tv = /^(\d{1,3})-(\d{1,3})-(\d{1,3})-(\d{1,3})-(\d{2,5})\./.exec(state);
+  var octets = tv ? tv.slice(1, 5).map(Number) : [];
+  var tvPort = tv ? Number(tv[5]) : 0;
+  var privateAddress = tv && octets.every(function (n) { return n <= 255; }) && (
+    octets[0] === 10 ||
+    (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) ||
+    (octets[0] === 192 && octets[1] === 168));
+  if (privateAddress && tvPort > 0 && tvPort < 65536 && arrived) {
+    document.getElementById("handing-tv").classList.remove("hidden");
+    window.location.replace("http://" + octets.join(".") + ":" + tvPort + "/callback" + window.location.search);
+  } else if (port > 0 && port < 65536 && arrived) {
     document.getElementById("handing").classList.remove("hidden");
     window.location.replace("http://127.0.0.1:" + port + "/callback" + window.location.search);
   }
